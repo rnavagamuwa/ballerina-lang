@@ -41,5 +41,4 @@ after_success:
 
 cache:
   directories:
-  # - $HOME/.gradle
-  - $HOME/.m2
+  - $HOME/.gradle
