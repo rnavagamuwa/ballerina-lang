@@ -26,6 +26,7 @@ import org.ballerinalang.compiler.CompilerPhase;
 import org.ballerinalang.langserver.command.executors.CreateTestExecutor;
 import org.ballerinalang.langserver.common.constants.CommandConstants;
 import org.ballerinalang.langserver.compiler.LSCompiler;
+import org.ballerinalang.langserver.compiler.LSCompilerCache;
 import org.ballerinalang.langserver.compiler.LSCompilerUtil;
 import org.ballerinalang.langserver.compiler.common.modal.BallerinaFile;
 import org.ballerinalang.langserver.compiler.workspace.ExtendedWorkspaceDocumentManagerImpl;
@@ -38,8 +39,10 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.wso2.ballerinalang.compiler.semantics.model.types.BServiceType;
 import org.wso2.ballerinalang.compiler.tree.BLangImportPackage;
 import org.wso2.ballerinalang.compiler.tree.BLangPackage;
 import org.wso2.ballerinalang.compiler.tree.BLangTestablePackage;
@@ -79,6 +82,11 @@ public class CommandExecutionTest {
     @BeforeClass
     public void init() throws Exception {
         this.serviceEndpoint = TestUtil.initializeLanguageSever();
+    }
+
+    @BeforeMethod
+    public void resetCache() {
+        LSCompilerCache.getInstance().clearAll();
     }
 
     @Test(dataProvider = "package-import-data-provider")
@@ -177,7 +185,7 @@ public class CommandExecutionTest {
         Assert.assertEquals(responseJson, expected, "Test Failed for: " + config);
     }
 
-    @Test(dataProvider = "testgen-fail-data-provider", enabled = false)
+    @Test(dataProvider = "testgen-fail-data-provider")
     public void testTestGenerationFailCases(String config, Path source) throws IOException {
         String configJsonPath = "command" + File.separator + config;
         Path sourcePath = sourcesPath.resolve("source").resolve(source);
@@ -206,7 +214,7 @@ public class CommandExecutionTest {
         }
     }
 
-    @Test(dataProvider = "testgen-data-provider", enabled = false)
+    @Test(dataProvider = "testgen-data-provider")
     public void testTestGeneration(String config, Path source) throws IOException {
         String configJsonPath = "command" + File.separator + config;
         Path sourcePath = sourcesPath.resolve("source").resolve(source);
@@ -238,6 +246,8 @@ public class CommandExecutionTest {
                 byte[] strToBytes = content.getBytes(Charset.defaultCharset());
                 outputStream.write(strToBytes);
             }
+            // Clear compiler cache since we are manipulating source files outside the LSP protocol
+            LSCompilerCache.getInstance().clearAll();
 
             // Compile the test file through the actual path, since it depends on the source-code
             LSCompiler compiler = new LSCompiler(ExtendedWorkspaceDocumentManagerImpl.getInstance());
@@ -282,6 +292,10 @@ public class CommandExecutionTest {
             testablePkg.getServices().forEach(service -> {
                 services.removeIf(ser -> service.name.value.equals(ser));
             });
+            testablePkg.getGlobalVariables().stream()
+                    .filter(simpleVariable -> simpleVariable.type instanceof BServiceType)
+                    .forEach(simpleVariable ->
+                            services.removeIf(serviceName -> serviceName.equals(simpleVariable.name.value)));
             // Check for pending expected values
             String failMsgTemplate = "Generated test file does not contain following %s:\n%s";
             if (!imports.isEmpty()) {

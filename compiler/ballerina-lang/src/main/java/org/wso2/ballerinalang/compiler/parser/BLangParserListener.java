@@ -302,17 +302,19 @@ public class BLangParserListener extends BallerinaParserBaseListener {
         boolean remoteFunc = ctx.REMOTE() != null;
         boolean nativeFunc = ctx.EXTERN() != null;
         boolean bodyExists = ctx.callableUnitBody() != null;
+        boolean privateFunc = ctx.PRIVATE() != null;
 
         if (ctx.Identifier() != null) {
             this.pkgBuilder
-                    .endObjectOuterFunctionDef(getCurrentPos(ctx), getWS(ctx), publicFunc, remoteFunc, nativeFunc,
+                    .endObjectOuterFunctionDef(getCurrentPos(ctx), getWS(ctx), publicFunc, privateFunc, remoteFunc,
+                            nativeFunc,
                             bodyExists, ctx.Identifier().getText());
             return;
         }
 
         boolean isReceiverAttached = ctx.typeName() != null;
 
-        this.pkgBuilder.endFunctionDef(getCurrentPos(ctx), getWS(ctx), publicFunc, remoteFunc, nativeFunc,
+        this.pkgBuilder.endFunctionDef(getCurrentPos(ctx), getWS(ctx), publicFunc, remoteFunc, nativeFunc, privateFunc,
                 bodyExists, isReceiverAttached, false);
     }
 
@@ -900,6 +902,10 @@ public class BLangParserListener extends BallerinaParserBaseListener {
 
     @Override
     public void exitRecordBindingPattern(BallerinaParser.RecordBindingPatternContext ctx) {
+        if (isInErrorState) {
+            return;
+        }
+
         this.pkgBuilder.addRecordBindingWS(getWS(ctx));
     }
 
@@ -2782,42 +2788,6 @@ public class BLangParserListener extends BallerinaParserBaseListener {
         }
 
         this.pkgBuilder.endWhereClauseNode(getCurrentPos(ctx), getWS(ctx));
-    }
-
-    @Override
-    public void enterSetAssignmentClause(BallerinaParser.SetAssignmentClauseContext ctx) {
-        if (isInErrorState) {
-            return;
-        }
-
-        this.pkgBuilder.startSetAssignmentClauseNode(getCurrentPos(ctx), getWS(ctx));
-    }
-
-    @Override
-    public void exitSetAssignmentClause(BallerinaParser.SetAssignmentClauseContext ctx) {
-        if (isInErrorState) {
-            return;
-        }
-
-        this.pkgBuilder.endSetAssignmentClauseNode(getCurrentPos(ctx), getWS(ctx));
-    }
-
-    @Override
-    public void enterSetClause(BallerinaParser.SetClauseContext ctx) {
-        if (isInErrorState) {
-            return;
-        }
-
-        this.pkgBuilder.startSetClauseNode();
-    }
-
-    @Override
-    public void exitSetClause(BallerinaParser.SetClauseContext ctx) {
-        if (isInErrorState) {
-            return;
-        }
-
-        this.pkgBuilder.endSetClauseNode(getWS(ctx), ctx.getChildCount() / 2);
     }
 
     @Override

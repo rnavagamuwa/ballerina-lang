@@ -15,6 +15,8 @@
  */
 package org.ballerinalang.langserver.codelenses;
 
+import org.ballerinalang.langserver.client.config.BallerinaClientConfigHolder;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ServiceLoader;
@@ -26,22 +28,48 @@ import java.util.ServiceLoader;
  */
 public class LSCodeLensesProviderFactory {
 
-    private static final LSCodeLensesProviderFactory provider = new LSCodeLensesProviderFactory();
+    private static final LSCodeLensesProviderFactory INSTANCE = new LSCodeLensesProviderFactory();
 
-    private List<LSCodeLensesProvider> providersList;
+    private List<LSCodeLensesProvider> providersList = new ArrayList<>();
+
+    private boolean isEnabled = true;
+
+    private boolean isInitialized = false;
 
     private LSCodeLensesProviderFactory() {
+        initiate();
+    }
+
+    public static LSCodeLensesProviderFactory getInstance() {
+        return INSTANCE;
+    }
+
+    /**
+     * Returns True if enabled, False otherwise.
+     *
+     * @return True if enabled
+     */
+    public boolean isEnabled() {
+        return isEnabled;
+    }
+
+    /**
+     * Initializes the code lenses factory.
+     */
+    public void initiate() {
+        if (isInitialized) {
+            return;
+        }
         ServiceLoader<LSCodeLensesProvider> providers = ServiceLoader.load(LSCodeLensesProvider.class);
-        providersList = new ArrayList<>();
         for (LSCodeLensesProvider executor : providers) {
             if (executor != null && executor.isEnabled()) {
                 providersList.add(executor);
             }
         }
-    }
-
-    public static LSCodeLensesProviderFactory getInstance() {
-        return provider;
+        BallerinaClientConfigHolder.getInstance().register((oldConfig, newConfig) -> {
+            isEnabled = newConfig.getCodeLens().getAll().isEnabled();
+        });
+        isInitialized = true;
     }
 
     /**
@@ -50,6 +78,30 @@ public class LSCodeLensesProviderFactory {
      * @return {@link List} Providers List
      */
     public List<LSCodeLensesProvider> getProviders() {
-        return new ArrayList<>(this.providersList);
+        List<LSCodeLensesProvider> activeProviders = new ArrayList<>();
+        for (LSCodeLensesProvider provider : providersList) {
+            if (provider != null && provider.isEnabled()) {
+                activeProviders.add(provider);
+            }
+        }
+        return activeProviders;
+    }
+
+    /**
+     * Add a code lens provider.
+     *
+     * @param provider  code lens provider to register
+     */
+    public void register(LSCodeLensesProvider provider) {
+        this.providersList.add(provider);
+    }
+
+    /**
+     * Remove code lens provider.
+     *
+     * @param provider  code lens provider to unregister
+     */
+    public void unregister(LSCodeLensesProvider provider) {
+        this.providersList.remove(provider);
     }
 }

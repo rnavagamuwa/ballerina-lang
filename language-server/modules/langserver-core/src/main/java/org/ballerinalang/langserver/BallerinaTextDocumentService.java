@@ -27,9 +27,9 @@ import org.ballerinalang.langserver.common.utils.CommonUtil;
 import org.ballerinalang.langserver.compiler.CollectDiagnosticListener;
 import org.ballerinalang.langserver.compiler.DocumentServiceKeys;
 import org.ballerinalang.langserver.compiler.LSCompiler;
+import org.ballerinalang.langserver.compiler.LSCompilerCache;
 import org.ballerinalang.langserver.compiler.LSCompilerException;
 import org.ballerinalang.langserver.compiler.LSCompilerUtil;
-import org.ballerinalang.langserver.compiler.LSContext;
 import org.ballerinalang.langserver.compiler.LSContextManager;
 import org.ballerinalang.langserver.compiler.LSPackageCache;
 import org.ballerinalang.langserver.compiler.LSServiceOperationContext;
@@ -457,6 +457,14 @@ class BallerinaTextDocumentService implements TextDocumentService {
     public CompletableFuture<List<? extends CodeLens>> codeLens(CodeLensParams params) {
         return CompletableFuture.supplyAsync(() -> {
             List<CodeLens> lenses = new ArrayList<>();
+
+            if (!LSCodeLensesProviderFactory.getInstance().isEnabled()) {
+                // Disabled ballerina codeLens feature
+                clientCapabilities.setCodeLens(null);
+                // Skip code lenses if codeLens disabled
+                return lenses;
+            }
+
             String fileUri = params.getTextDocument().getUri();
             Path docSymbolFilePath = new LSDocument(fileUri).getPath();
             Path compilationPath = getUntitledFilePath(docSymbolFilePath.toString()).orElse(docSymbolFilePath);
@@ -464,7 +472,7 @@ class BallerinaTextDocumentService implements TextDocumentService {
             try {
                 LSServiceOperationContext codeLensContext = new LSServiceOperationContext();
                 codeLensContext.put(DocumentServiceKeys.FILE_URI_KEY, fileUri);
-                BLangPackage bLangPackage = lsCompiler.getBLangPackage(codeLensContext, documentManager, false,
+                BLangPackage bLangPackage = lsCompiler.getBLangPackage(codeLensContext, documentManager, true,
                                                                        LSCustomErrorStrategy.class, false);
                 Optional<BLangCompilationUnit> documentCUnit = bLangPackage.getCompilationUnits().stream()
                         .filter(cUnit -> (fileUri.endsWith(cUnit.getName())))
@@ -479,17 +487,17 @@ class BallerinaTextDocumentService implements TextDocumentService {
                     listener.clearAll();
                 }
 
+                codeLensContext.put(CodeLensesProviderKeys.BLANG_PACKAGE_KEY, bLangPackage);
+                codeLensContext.put(CodeLensesProviderKeys.FILE_URI_KEY, fileUri);
+                codeLensContext.put(CodeLensesProviderKeys.DIAGNOSTIC_KEY, diagnostics);
+
                 documentCUnit.ifPresent(cUnit -> {
-                    LSContext context = new LSServiceOperationContext();
-                    context.put(CodeLensesProviderKeys.COMPILATION_UNIT_KEY, cUnit);
-                    context.put(CodeLensesProviderKeys.BLANG_PACKAGE_KEY, bLangPackage);
-                    context.put(CodeLensesProviderKeys.FILE_URI_KEY, fileUri);
-                    context.put(CodeLensesProviderKeys.DIAGNOSTIC_KEY, diagnostics);
+                    codeLensContext.put(CodeLensesProviderKeys.COMPILATION_UNIT_KEY, cUnit);
 
                     List<LSCodeLensesProvider> providers = LSCodeLensesProviderFactory.getInstance().getProviders();
                     for (LSCodeLensesProvider provider : providers) {
                         try {
-                            lenses.addAll(provider.getLenses(context));
+                            lenses.addAll(provider.getLenses(codeLensContext));
                         } catch (LSCodeLensesProviderException e) {
                             LOGGER.error("Error while retrieving lenses from: " + provider.getName());
                         }
@@ -680,6 +688,10 @@ class BallerinaTextDocumentService implements TextDocumentService {
             try {
                 Path compilationPath = getUntitledFilePath(openedPath.toString()).orElse(openedPath);
                 lock = documentManager.openFile(compilationPath, content);
+                // Clear cache
+                String sourceRoot = LSCompilerUtil.getSourceRoot(compilationPath);
+                String moduleName = LSCompilerUtil.getPackageNameForGivenFile(sourceRoot, compilationPath.toString());
+                LSCompilerCache.getInstance().clearAll(sourceRoot, moduleName);
                 LanguageClient client = this.ballerinaLanguageServer.getClient();
                 diagnosticsHelper.compileAndSendDiagnostics(client, lsCompiler, openedPath, compilationPath);
             } catch (WorkspaceDocumentException e) {
@@ -699,6 +711,10 @@ class BallerinaTextDocumentService implements TextDocumentService {
             try {
                 Path compilationPath = getUntitledFilePath(changedPath.toString()).orElse(changedPath);
                 lock = documentManager.updateFile(compilationPath, content);
+                // Clear cache
+                String sourceRoot = LSCompilerUtil.getSourceRoot(compilationPath);
+                String moduleName = LSCompilerUtil.getPackageNameForGivenFile(sourceRoot, compilationPath.toString());
+                LSCompilerCache.getInstance().clearAll(sourceRoot, moduleName);
                 LanguageClient client = this.ballerinaLanguageServer.getClient();
                 this.diagPushDebouncer.call(() -> {
                     diagnosticsHelper.compileAndSendDiagnostics(client, lsCompiler, changedPath, compilationPath);
@@ -721,6 +737,10 @@ class BallerinaTextDocumentService implements TextDocumentService {
 
         try {
             Path compilationPath = getUntitledFilePath(closedPath.toString()).orElse(closedPath);
+            // Clear cache
+            String sourceRoot = LSCompilerUtil.getSourceRoot(compilationPath);
+            String moduleName = LSCompilerUtil.getPackageNameForGivenFile(sourceRoot, compilationPath.toString());
+            LSCompilerCache.getInstance().clearAll(sourceRoot, moduleName);
             this.documentManager.closeFile(compilationPath);
         } catch (WorkspaceDocumentException e) {
             LOGGER.error("Error occurred while closing file:" + closedPath.toString(), e);
