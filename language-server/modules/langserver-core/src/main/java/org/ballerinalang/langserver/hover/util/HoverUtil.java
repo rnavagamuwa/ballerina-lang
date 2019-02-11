@@ -447,10 +447,11 @@ public class HoverUtil {
     }
 
     /**
-     * Calculate and returns identifier position of this BlangVariable.
+     * Calculate and returns identifier position of this BLangVariable.
      *
-     * @param varNode BLangSimpleVariable
-     * @return position
+     * @param varNode  BLangSimpleVariable
+     * @param position {@link DiagnosticPos} of the BLangSimpleVariable
+     * @return position modified {@link DiagnosticPos}
      */
     public static DiagnosticPos getIdentifierPosition(BLangSimpleVariable varNode, DiagnosticPos position) {
         Set<Whitespace> wsSet = varNode.getWS();
