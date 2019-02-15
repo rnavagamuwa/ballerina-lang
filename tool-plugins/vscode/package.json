@@ -6,7 +6,7 @@
     "publisher": "ballerina",
     "repository": {
         "type": "git",
-        "url": "https://github.com/ballerina-lang/ballerina"
+        "url": "https://github.com/ballerina-platform/ballerina-lang"
     },
     "icon": "resources/images/ballerina.png",
     "galleryBanner": {
@@ -18,7 +18,9 @@
     },
     "categories": [
         "Programming Languages",
-        "Debuggers"
+        "Debuggers",
+        "Formatters",
+        "Snippets"
     ],
     "activationEvents": [
         "onLanguage:ballerina",
@@ -77,7 +79,7 @@
                 },
                 "ballerina.codeLens.services.enabled": {
                     "type": "boolean",
-                    "default": true,
+                    "default": false,
                     "description": "If set to true ballerina services code lens feature will be allowed"
                 },
                 "ballerina.codeLens.endpoints.enabled": {
