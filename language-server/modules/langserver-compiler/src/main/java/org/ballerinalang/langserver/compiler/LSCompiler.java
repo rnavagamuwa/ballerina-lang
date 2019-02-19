@@ -296,9 +296,13 @@ public class LSCompiler {
         if ((bfile = compilerCache.get(key)) != null) {
             return bfile;
         } else {
-            BLangPackage bLangPackage = compiler.compile(moduleName);
             boolean isProjectDir = (LSCompilerUtil.isBallerinaProject(sourceRoot, uri));
-            bfile = new BallerinaFile(bLangPackage, diagnostics, isProjectDir, compilerContext);
+            try {
+                BLangPackage bLangPackage = compiler.compile(moduleName);
+                bfile = new BallerinaFile(bLangPackage, diagnostics, isProjectDir, compilerContext);
+            } catch (RuntimeException e) {
+                bfile = new BallerinaFile(null, diagnostics, isProjectDir, compilerContext);
+            }
             // Update compilerCache
             compilerCache.put(key, bfile);
         }
