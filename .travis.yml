@@ -16,9 +16,10 @@ language: java
 
 sudo: required
 
-matrix: 
-  env: TO_TEST=MAVEN
-  env: TO_TEST=GRADLE
+
+env:
+  - BUILD_TYPE=MAVEN
+  - BUILD_TYPE=GRADLE
 
 services:
   - docker
@@ -36,13 +37,14 @@ install:
   - nvm use 8.9.0
   - npm install -g npm@'5.6.0'
 
-script: echo "Done"
-  - if [ "$TO_TEST" = "MAVEN" ]; then `mvn install -B -V`; fi
-  - if [ "$TO_TEST" = "MAVEN" ]; then `./gradlew createZip`; fi
+script:
+  - if [ "$BUILD_TYPE" = "MAVEN" ]; then mvn install -B -V; fi
+  - if [ "$BUILD_TYPE" = "GRADLE" ]; then ./gradlew createZip; fi
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 
 cache:
   directories:
-  - $HOME/.gradle
+    - $HOME/.m2
+    - $HOME/.gradle
